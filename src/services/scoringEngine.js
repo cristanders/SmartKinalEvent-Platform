@@ -1,5 +1,5 @@
 /**
- * Scoring & Leaderboard Engine
+ * Scoring & Leaderboard Engine (High Efficiency O(N) Aggregation)
  * Calculates weighted scores per rubric, aggregates scores across multiple judges,
  * breaks ties deterministically, and builds live leaderboard metrics.
  */
@@ -38,19 +38,29 @@ class ScoringEngine {
       presentation * this.weights.presentation
     );
 
-    // Scale 10-point scale weighted sum to 100-point scale
     return Math.round(rawWeightedSum * 10 * 10) / 10;
   }
 
   /**
-   * Aggregates all judging scores for projects and produces sorted leaderboard ranks.
+   * Aggregates judging scores for projects into sorted leaderboard ranks in O(P + S) linear time.
    * @param {Array} projects 
    * @param {Array} scores 
    * @returns {Array} Ranked Leaderboard array
    */
   generateLeaderboard(projects = [], scores = []) {
+    // Group scores by projectId in O(S) linear time to eliminate nested array filtering
+    const scoresByProject = new Map();
+    scores.forEach(s => {
+      let group = scoresByProject.get(s.projectId);
+      if (!group) {
+        group = [];
+        scoresByProject.set(s.projectId, group);
+      }
+      group.push(s);
+    });
+
     const projectStats = projects.map(proj => {
-      const projScores = scores.filter(s => s.projectId === proj.id);
+      const projScores = scoresByProject.get(proj.id) || [];
       
       if (projScores.length === 0) {
         return {
@@ -73,7 +83,6 @@ class ScoringEngine {
         };
       }
 
-      // Sum criteria totals
       let sumInnovation = 0;
       let sumTech = 0;
       let sumUiUx = 0;
@@ -144,20 +153,26 @@ class ScoringEngine {
    */
   generateOrganizerAnalytics(dataStoreInstance) {
     const participants = dataStoreInstance.getParticipants();
-    const teams = dataStoreInstance.getTeams ? dataStoreInstance.getTeams() : dataStoreInstance.teams;
+    const teams = dataStoreInstance.teams;
     const projects = dataStoreInstance.getProjects();
     const scores = dataStoreInstance.getJudgingScores();
 
     const totalRegistrations = participants.length;
-    const checkedInCount = participants.filter(p => p.checkedIn).length;
-    const checkInRate = totalRegistrations > 0 ? Math.round((checkedInCount / totalRegistrations) * 100) : 0;
+    
+    // Single pass accumulation for participant checkins and team membership (O(N) vs multiple .filter())
+    let checkedInCount = 0;
+    let participantsInTeams = 0;
 
-    const participantsInTeams = participants.filter(p => p.teamId !== null).length;
+    participants.forEach(p => {
+      if (p.checkedIn) checkedInCount++;
+      if (p.teamId !== null) participantsInTeams++;
+    });
+
+    const checkInRate = totalRegistrations > 0 ? Math.round((checkedInCount / totalRegistrations) * 100) : 0;
     const teamFormationRate = totalRegistrations > 0 ? Math.round((participantsInTeams / totalRegistrations) * 100) : 0;
 
     const leaderboard = this.generateLeaderboard(projects, scores);
 
-    // Calculate global category averages across evaluated projects
     let globalCategoryAverages = {
       innovation: 0,
       techComplexity: 0,

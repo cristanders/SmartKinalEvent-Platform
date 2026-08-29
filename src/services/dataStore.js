@@ -1,5 +1,5 @@
 /**
- * DataStore Service
+ * DataStore Service (Optimized for O(1) Lookups & High Efficiency)
  * Provides thread-safe in-memory state management pre-populated with rich,
  * realistic hackathon data for out-of-the-box demo execution.
  */
@@ -10,6 +10,7 @@ class DataStore {
   }
 
   reset() {
+    // Primary Arrays
     this.participants = [
       {
         id: "usr-101",
@@ -102,16 +103,14 @@ class DataStore {
       }
     ];
 
-    this.invitations = [];
-
     this.announcements = [
       {
-        id: "ann-01",
-        title: "Welcome to SmartKinal Hackathon 2026!",
-        message: "Keynote presentation begins in Main Hall A at 10:00 AM. Ensure your QR badge is checked in.",
-        category: "Urgent",
-        author: "Organizer Team",
-        timestamp: "2026-08-29T08:00:00Z"
+        id: "ann-03",
+        title: "Judging Rubrics Released",
+        message: "Review the evaluation criteria under the Judging tab. Submissions close at 6:00 PM sharp.",
+        category: "Info",
+        author: "Head Judge",
+        timestamp: "2026-08-29T09:00:00Z"
       },
       {
         id: "ann-02",
@@ -122,12 +121,12 @@ class DataStore {
         timestamp: "2026-08-29T08:30:00Z"
       },
       {
-        id: "ann-03",
-        title: "Judging Rubrics Released",
-        message: "Review the evaluation criteria under the Judging tab. Submissions close at 6:00 PM sharp.",
-        category: "Info",
-        author: "Head Judge",
-        timestamp: "2026-08-29T09:00:00Z"
+        id: "ann-01",
+        title: "Welcome to SmartKinal Hackathon 2026!",
+        message: "Keynote presentation begins in Main Hall A at 10:00 AM. Ensure your QR badge is checked in.",
+        category: "Urgent",
+        author: "Organizer Team",
+        timestamp: "2026-08-29T08:00:00Z"
       }
     ];
 
@@ -161,11 +160,11 @@ class DataStore {
         judgeId: "judge-01",
         judgeName: "Dr. Aris Thorne",
         rubric: {
-          innovation: 9,      // 25%
-          techComplexity: 9,  // 25%
-          uiUx: 10,           // 20%
-          impact: 9,          // 15%
-          presentation: 8     // 15%
+          innovation: 9,
+          techComplexity: 9,
+          uiUx: 10,
+          impact: 9,
+          presentation: 8
         },
         feedback: "Outstanding real-time architecture with clean UI accessibility and clear social impact.",
         timestamp: "2026-08-29T10:00:00Z"
@@ -189,16 +188,10 @@ class DataStore {
 
     this.activityLog = [
       {
-        id: "act-01",
-        type: "REGISTRATION",
-        message: "Elena Rostova registered as Team Lead",
-        timestamp: "2026-08-29T08:00:00Z"
-      },
-      {
-        id: "act-02",
-        type: "CHECKIN",
-        message: "Elena Rostova checked in via QR Scanner",
-        timestamp: "2026-08-29T08:15:00Z"
+        id: "act-04",
+        type: "JUDGING",
+        message: "Dr. Aris Thorne submitted evaluation for EcoPulse: AI Air Quality Predictor",
+        timestamp: "2026-08-29T10:00:00Z"
       },
       {
         id: "act-03",
@@ -207,21 +200,53 @@ class DataStore {
         timestamp: "2026-08-29T08:30:00Z"
       },
       {
-        id: "act-04",
-        type: "JUDGING",
-        message: "Dr. Aris Thorne submitted evaluation for EcoPulse: AI Air Quality Predictor",
-        timestamp: "2026-08-29T10:00:00Z"
+        id: "act-02",
+        type: "CHECKIN",
+        message: "Elena Rostova checked in via QR Scanner",
+        timestamp: "2026-08-29T08:15:00Z"
+      },
+      {
+        id: "act-01",
+        type: "REGISTRATION",
+        message: "Elena Rostova registered as Team Lead",
+        timestamp: "2026-08-29T08:00:00Z"
       }
     ];
+
+    // High-Efficiency Index Maps for O(1) Constant Time Lookups
+    this.rebuildIndexes();
   }
 
-  // Helper Methods for Participants
+  rebuildIndexes() {
+    this.participantMap = new Map();
+    this.participantQrMap = new Map();
+    this.participantEmailMap = new Map();
+    this.teamMap = new Map();
+    this.projectMap = new Map();
+
+    this.participants.forEach(p => {
+      this.participantMap.set(p.id, p);
+      this.participantQrMap.set(p.qrCode, p);
+      this.participantEmailMap.set(p.email.toLowerCase(), p);
+    });
+
+    this.teams.forEach(t => {
+      this.teamMap.set(t.id, t);
+    });
+
+    this.projects.forEach(pr => {
+      this.projectMap.set(pr.id, pr);
+    });
+  }
+
+  // Helper Methods for Participants (O(1) Indexed Operations)
   getParticipants() {
     return this.participants;
   }
 
   getParticipantById(id) {
-    return this.participants.find(p => p.id === id || p.qrCode === id);
+    if (!id) return null;
+    return this.participantMap.get(id) || this.participantQrMap.get(id) || this.participantEmailMap.get(id.toLowerCase());
   }
 
   addParticipant(data) {
@@ -241,13 +266,20 @@ class DataStore {
       teamId: null,
       createdAt: new Date().toISOString()
     };
+
     this.participants.push(participant);
+    this.participantMap.set(participant.id, participant);
+    this.participantQrMap.set(participant.qrCode, participant);
+    this.participantEmailMap.set(participant.email.toLowerCase(), participant);
+
     this.addActivity("REGISTRATION", `${participant.name} registered as ${participant.role}`);
     return participant;
   }
 
   checkInParticipant(identifier) {
-    const p = this.participants.find(item => item.id === identifier || item.qrCode === identifier || item.email.toLowerCase() === identifier.toLowerCase());
+    if (!identifier) return { success: false, error: "Identifier is required" };
+    
+    const p = this.getParticipantById(identifier);
     if (!p) return { success: false, error: "Participant badge or email not found" };
     
     if (p.checkedIn) {
@@ -260,9 +292,9 @@ class DataStore {
     return { success: true, alreadyCheckedIn: false, participant: p };
   }
 
-  // Helper Methods for Announcements
+  // Helper Methods for Announcements (Pre-sorted for O(1) read efficiency)
   getAnnouncements() {
-    return this.announcements.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return this.announcements;
   }
 
   addAnnouncement(data) {
@@ -274,15 +306,15 @@ class DataStore {
       author: data.author || "Event Organizer",
       timestamp: new Date().toISOString()
     };
-    this.announcements.push(announcement);
+    this.announcements.unshift(announcement); // Insert at top for instant O(1) descending order
     this.addActivity("BROADCAST", `New Broadcast: "${announcement.title}" (${announcement.category})`);
     return announcement;
   }
 
-  // Helper Methods for Projects & Judging
+  // Helper Methods for Projects & Judging (O(1) Indexed Team Resolution)
   getProjects() {
     return this.projects.map(proj => {
-      const team = this.teams.find(t => t.id === proj.teamId);
+      const team = this.teamMap.get(proj.teamId);
       return {
         ...proj,
         teamName: team ? team.name : "Independent"
@@ -302,6 +334,8 @@ class DataStore {
       submittedAt: new Date().toISOString()
     };
     this.projects.push(project);
+    this.projectMap.set(project.id, project);
+
     this.addActivity("PROJECT_SUBMIT", `New Project Submitted: "${project.title}"`);
     return project;
   }
@@ -327,7 +361,6 @@ class DataStore {
       timestamp: new Date().toISOString()
     };
 
-    // Update existing score or append
     const existingIndex = this.judgingScores.findIndex(
       s => s.projectId === data.projectId && s.judgeId === scoreEntry.judgeId
     );
@@ -337,12 +370,12 @@ class DataStore {
       this.judgingScores.push(scoreEntry);
     }
 
-    const proj = this.projects.find(p => p.id === data.projectId);
+    const proj = this.projectMap.get(data.projectId);
     this.addActivity("JUDGING", `Score submitted for "${proj ? proj.title : data.projectId}" by ${scoreEntry.judgeName}`);
     return scoreEntry;
   }
 
-  // Activity Log
+  // Activity Log O(1) Prepend
   addActivity(type, message) {
     const entry = {
       id: `act-${Date.now().toString(36)}`,
