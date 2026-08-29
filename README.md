@@ -120,19 +120,9 @@ The interface follows a **sleek, corporate tech aesthetic** (inspired by Stripe,
 - **Container Security**: Executes as non-root `USER node`.
 - **Proxy Trust**: Configured `app.set('trust proxy', 1)` for Google Cloud SSL Load Balancer IP forwarding.
 
-### Deployment Commands
+### Deployment 
 
-```bash
-# 1. Set Google Cloud Project
-gcloud config set project YOUR_GCP_PROJECT_ID
-
-# 2. Deploy directly to Cloud Run
-gcloud run deploy smart-kinal-event-platform \
-  --source . \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --port 8080
-```
+https://smartkinalevent-platform.onrender.com/
 
 ---
 
